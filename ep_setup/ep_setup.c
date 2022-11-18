@@ -605,10 +605,22 @@ int WINAPI wWinMain(
     if (bOk || (!bOk && GetLastError() == ERROR_ALREADY_EXISTS))
     {
         bOk = TRUE;
+        HANDLE userToken = INVALID_HANDLE_VALUE;
 
         HWND hShellTrayWnd = FindWindowW(L"Shell_TrayWnd", NULL);
         if (hShellTrayWnd)
         {
+            DWORD explorerProcessId = 0;
+            GetWindowThreadProcessId(hShellTrayWnd, &explorerProcessId);
+            if (explorerProcessId != 0)
+            {
+                HANDLE explorerProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, explorerProcessId);
+                if (explorerProcess != NULL)
+                {
+                    OpenProcessToken(explorerProcess, TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_ASSIGN_PRIMARY, &userToken);
+                    CloseHandle(explorerProcess);
+                }
+            }
             PDWORD_PTR res = -1;
             if (!SendMessageTimeoutW(hShellTrayWnd, 1460, 0, 0, SMTO_ABORTIFHUNG, 2000, &res) && res)
             {
@@ -1187,7 +1199,11 @@ int WINAPI wWinMain(
             exit(0);
         }
 
-        StartExplorerWithDelay(1000);
+        StartExplorerWithDelay(1000, userToken);
+        if (userToken != INVALID_HANDLE_VALUE)
+        {
+            CloseHandle(userToken);
+        }
     }
 
 	return GetLastError();
